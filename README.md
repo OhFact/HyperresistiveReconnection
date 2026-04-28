@@ -1,5 +1,7 @@
 This code evaluates some aspects of the paper Magnetic reconnection mediated by hyper-resistive plasmoid instability  by Yi-Min Huang, A. Bhattacharjee, and Terry G. Forbes
 
+Report submitted via google doc: https://docs.google.com/document/d/1_LTZVEtPM8AIFoO3AqhFmZ-xdfRqUbaZDCGLqH0tk9g/edit?usp=sharing
+
 I'd recommend making a new conda env like this:
 conda create -n mhx_env python=3.10 -y
 
