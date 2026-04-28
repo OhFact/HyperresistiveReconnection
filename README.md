@@ -22,7 +22,10 @@ conda pack -n mhx_env -o mhx_env.tar.gz
 Then, move this tarball to your CHTC dir, alongside run_mhx.sh
 
 To run "run_plasmoid.py", move run_plasmoid.py and run_plasmoid.sub into your CHTC dir, and run it with condor_submit run_plasmoid.sub
+scp out history.npz, and the png it creates, move history.npz into your MHX directory, and then run:
+python scripts/legacy/mhd_tearing_island_evolution.py     --input history.npz     --make-movie
 
 To run "sweep_ky.py", move sweep_ky.py and sweep_ky.sub into your CHTC dir, and run it with condor_submit sweep_ky.sub
+scp out the outputs, and you are done
 
 To run "linear.py", configure which of the 3 runs you want to do (64,64),(64,128),or(128,128)
