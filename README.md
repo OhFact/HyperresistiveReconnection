@@ -28,4 +28,4 @@ python scripts/legacy/mhd_tearing_island_evolution.py     --input history.npz   
 To run "sweep_ky.py", move sweep_ky.py and sweep_ky.sub into your CHTC dir, and run it with condor_submit sweep_ky.sub
 scp out the outputs, and you are done
 
-To run "linear.py", configure which of the 3 runs you want to do (64,64),(64,128),or(128,128)
+To run "linear.py", configure which of the 3 runs you want to do (Nx, Ny) = (64,64), (64,128),or (128,128) in your python file by changing the inputs at cfg = TearingSimConfig, and then just run on cpu.
