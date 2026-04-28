@@ -2,11 +2,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-
-# Set headless backend for environment stability
 matplotlib.use('Agg')
 
-# Force CPU execution as requested
 os.environ["JAX_PLATFORMS"] = "cpu"
 os.environ["JAX_ENABLE_X64"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -23,35 +20,31 @@ def main():
     gamma_values = []
 
     # Setup for multiple diagnostic plots
-    plt.figure(1, figsize=(10, 6))  # Native Mode Amplitude Fitting
+    plt.figure(1, figsize=(10, 6))
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-
-    # Setup subplot grid for Magnetic Potential Contours
     fig_contour, axes_contour = plt.subplots(len(S_H_values), 1, figsize=(8, 4 * len(S_H_values)))
 
-    print(f"\n{'S_H':<10} | {'Native Growth Rate (gamma)':<30}")
-    print("-" * 45)
+    print(f"\n{'S_H':<10} | {'gamma':<30}")
 
     for i, S_H in enumerate(S_H_values):
-        # 1. Calculate dynamic Lx to target the fastest growing mode
-        a_fixed = 0.5
-        k_max = (1.0 / a_fixed) * (float(S_H) ** (-1.0 / 6.0))
-        L_x_dynamic = 2.0 * np.pi / k_max
+        a = 0.5
+        k_max = (1.0 / a) * (float(S_H) ** (-1.0 / 6.0)) #guess of where max growth rate would be using -1/6 scaling from paper
+        L_x = 2.0 * np.pi / k_max #Dynamic length of box in x axis
 
         cfg = TearingSimConfig(
             equilibrium_mode="original",
-            a=a_fixed,
-            Lx=L_x_dynamic,  # Dynamic box size to track the peak
+            a=a,
+            Lx=L_x,
             Ly=2.0 * np.pi,
             Nx=64,
-            Ny=64,  # High resolution to resolve the thin layer
+            Ny=64, 
             Nz=1,
             eta=1e-16, nu=1e-16,
-            B_g=0.0,  # No guide field (maximum instability)
-            t1=150.0,  # Longer time for islands to develop
+            B_g=0.0,  # No guide field
+            t1=150.0, 
             dt0=0.005,
             n_frames=80,
-            eps_B=0.05  # Strong seed to overcome numerical noise
+            eps_B=0.05  # perturbation
         )
 
         eta4 = (cfg.a ** 3 * cfg.B0) / float(S_H)
@@ -69,33 +62,26 @@ def main():
             jit=False
         )
 
-        # --- EXTRACT NATIVE MHX GAMMA AND FITTING DATA ---
         ts = np.array(res['ts'])
         mode_amp = np.array(res['mode_amp_series'])
 
-        # The solver's internal calculation of the linear fit
+        # The solver's calculation of the fit
         gamma = float(res['gamma_fit'])
         lnA_fit = np.array(res['lnA_fit'])
         mask_lin = np.array(res['mask_lin'], dtype=bool)
-
         gamma_values.append(gamma)
 
-        # --- Plot Native Log-Linear Mode Growth ---
-        plt.figure(1)
-        # Add epsilon to prevent log(0) if amplitude drops entirely
-        log_mode = np.log(mode_amp + 1e-30)
-
-        # Plot raw amplitude data points
+        # plot log-linear growth
+        plt.figure(1) 
+        log_mode = np.log(mode_amp + 1e-30) # prevent log(0) error with small 1e-30
         plt.plot(ts, log_mode, 'o', markersize=4, color=colors[i], alpha=0.4, label=f'$S_H = {S_H:.1e}$')
-
-        # Plot the solver's internal fit line over the masked region
         if np.any(mask_lin):
             plt.plot(ts[mask_lin], lnA_fit, linewidth=2.5, color=colors[i],
                      label=f'MHX Fit ($\gamma={gamma:.4f}$)')
 
         print(f"{float(S_H):.1e} | {gamma:.6f}", flush=True)
 
-        # --- GENERATE MAGNETIC POTENTIAL (A_z) CONTOURS ---
+        # Magnetic potential contour plotting
         kx, ky, kz, k2, NX, NY, NZ = make_k_arrays(cfg.Nx, cfg.Ny, cfg.Nz, cfg.Lx, cfg.Ly, cfg.Lz)
         B_hat_final = res['B_hat'][-1]
         Az_real = compute_Az_from_hat(B_hat_final, kx, ky)
@@ -112,7 +98,6 @@ def main():
         ax.set_ylabel('y')
         fig_contour.colorbar(cf, ax=ax)
 
-    # Save Native Mode Amplitude verification plot
     plt.figure(1)
     plt.xlabel('Time ($t$)')
     plt.ylabel('$\ln($Mode Amplitude$)$')
@@ -126,7 +111,7 @@ def main():
     fig_contour.tight_layout()
     fig_contour.savefig("magnetic_reconnection_contours.png", dpi=300)
 
-    # Save Scaling Replication plot (gamma vs S_H)
+    # Save S^-1/3 scaling plot
     gamma_values = np.array(gamma_values)
     log_SH = np.log10(S_H_values)
     log_gamma = np.log10(gamma_values)
@@ -135,7 +120,7 @@ def main():
     plt.figure(3, figsize=(8, 6))
     plt.loglog(S_H_values, gamma_values, 'o-', color='navy', markersize=8, label='Simulation')
 
-    # Compare with theoretical S_H^-1/3 scaling
+    # Plot theoretical slope
     plt.loglog(S_H_values, 10 ** (intercept + slope * log_SH), 'r--', linewidth=2,
                label=f'Empirical Slope: {slope:.3f} (Theory: -0.333)')
 
@@ -146,9 +131,6 @@ def main():
     plt.legend()
     plt.tight_layout()
     plt.savefig("fig2_gamma_scaling.png", dpi=300)
-
-    print("\nSaved: native_growth_fits.png, magnetic_reconnection_contours.png, and fig2_gamma_scaling.png")
-
 
 if __name__ == "__main__":
     main()
