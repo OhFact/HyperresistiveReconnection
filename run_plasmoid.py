@@ -1,6 +1,4 @@
 import os
-
-# Suppress some of the loud C++ backend warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import jax
@@ -9,68 +7,16 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Internal MHX imports (NO mhx.io needed!)
 from mhx.config import TearingSimConfig
 from mhx.solver.tearing import _run_tearing_simulation_and_diagnostics
 from mhx.solver.plugins import HyperResistivityTerm
 jax.config.update("jax_enable_x64", True)
 
-def run_high_res_plasmoid():
-    # 1. Setup configuration
-    cfg = TearingSimConfig(
-        Nx=128,
-        Ny=512,
-        Lx=2.0 * np.pi,
-        Ly=8.0 * np.pi,
-        t1=250.0,
-        n_frames=200,
-        eta=1e-5,
-        nu=1e-5,
-        dt0=5e-5,
-        equilibrium_mode="original"
-    )
-
-    # 2. Inject Hyper-Resistivity
-    print("Initializing Hyper-Resistivity directly in Python...")
-    hyper_term = HyperResistivityTerm(eta4=1e-4)
-    terms = [hyper_term]
-
-    # 3. Pathing for Cluster Execution
-    run_dir = Path(".")
-    outfile = run_dir / "history.npz"
-
-    print(f"Starting GPU simulation. Saving to: {outfile.absolute()}")
-
-    # 4. Run the core solver
-    res_dict = _run_tearing_simulation_and_diagnostics(
-        Nx=cfg.Nx, Ny=cfg.Ny, Nz=getattr(cfg, 'Nz', 1),
-        Lx=cfg.Lx, Ly=cfg.Ly, Lz=getattr(cfg, 'Lz', 1.0),
-        nu=cfg.nu, eta=cfg.eta, B0=getattr(cfg, 'B0', 1.0), a=getattr(cfg, 'a', 1.0),
-        B_g=getattr(cfg, 'B_g', 0.0), eps_B=getattr(cfg, 'eps_B', 0.01),
-        t0=getattr(cfg, 't0', 0.0), t1=cfg.t1, n_frames=cfg.n_frames, dt0=cfg.dt0,
-        equilibrium_mode=cfg.equilibrium_mode,
-        terms=terms,
-        progress=True
-    )
-
-    # 5. FOOLPROOF SAVING: Use standard NumPy instead of mhx.io
-    print("Simulation complete! Saving data to disk...")
-    # Convert JAX arrays to standard NumPy arrays before saving to prevent XLA errors
-    safe_res_dict = {k: np.array(v) for k, v in res_dict.items()}
-    np.savez(outfile, **safe_res_dict)
-
-    print(f"Data successfully saved to {outfile}")
-
-    # 6. Generate contour plots
-    plot_magnetic_contours(str(outfile), run_dir, cfg.Nx, cfg.Ny, cfg.Lx, cfg.Ly)
-
-
 def plot_magnetic_contours(data_path, out_dir, Nx, Ny, Lx, Ly):
-    print("Generating magnetic field contour plots...")
     data = np.load(data_path)
 
     if 'B_hat' not in data:
-        print("Error: Could not find 'B_hat' in the output.")
+        print("Error: can't find B_hat")
         return
 
     B_hat_history = data['B_hat']
@@ -110,6 +56,51 @@ def plot_magnetic_contours(data_path, out_dir, Nx, Ny, Lx, Ly):
     plt.close()
 
     print(f"Plot successfully saved to {plot_file}")
+
+def run_high_res_plasmoid():
+    cfg = TearingSimConfig(
+        Nx=128,
+        Ny=512,
+        Lx=2.0 * np.pi,
+        Ly=8.0 * np.pi,
+        t1=250.0,
+        n_frames=200,
+        eta=1e-5,
+        nu=1e-5,
+        dt0=5e-5,
+        equilibrium_mode="original"
+    )
+
+    #hyperresistivity term
+    hyper_term = HyperResistivityTerm(eta4=1e-4)
+    terms = [hyper_term]
+
+    run_dir = Path(".")
+    outfile = run_dir / "history.npz"
+
+    print(f"Saving to: {outfile.absolute()}")
+
+    #Run the solver
+    res_dict = _run_tearing_simulation_and_diagnostics(
+        Nx=cfg.Nx, Ny=cfg.Ny, Nz=getattr(cfg, 'Nz', 1),
+        Lx=cfg.Lx, Ly=cfg.Ly, Lz=getattr(cfg, 'Lz', 1.0),
+        nu=cfg.nu, eta=cfg.eta, B0=getattr(cfg, 'B0', 1.0), a=getattr(cfg, 'a', 1.0),
+        B_g=getattr(cfg, 'B_g', 0.0), eps_B=getattr(cfg, 'eps_B', 0.01),
+        t0=getattr(cfg, 't0', 0.0), t1=cfg.t1, n_frames=cfg.n_frames, dt0=cfg.dt0,
+        equilibrium_mode=cfg.equilibrium_mode,
+        terms=terms,
+        progress=True
+    )
+
+    # convert jax to numpy array 
+    safe_res_dict = {k: np.array(v) for k, v in res_dict.items()}
+    np.savez(outfile, **safe_res_dict)
+
+    print(f"Saved to {outfile}")
+
+    plot_magnetic_contours(str(outfile), run_dir, cfg.Nx, cfg.Ny, cfg.Lx, cfg.Ly)
+
+
 
 if __name__ == "__main__":
     run_high_res_plasmoid()
